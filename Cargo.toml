@@ -1,0 +1,43 @@
+[package]
+name = "clothing_price_tracker"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]# Web Framework
+axum = "0.7"
+tower = "0.4"
+tower-http = { version = "0.5", features = ["cors", "trace"] }
+
+# Async Runtime
+tokio = { version = "1", features = ["full"] }
+
+# Database
+mongodb = "2.8"
+bson = { version = "2.9", features = ["chrono-0_4"] }
+
+# HTTP Client & Scraping
+reqwest = { version = "0.11", features = ["json", "cookies"] }
+scraper = "0.19"
+regex = "1.10"
+select = "0.6"
+
+# Headless Browser (optional for SPA sites)
+thirtyfour = "0.32"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Error Handling
+anyhow = "1.0"
+thiserror = "1.0"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Utilities
+chrono = { version = "0.4", features = ["serde"] }
+dotenv = "0.15"
+async-trait = "0.1"
+futures = "0.3"
