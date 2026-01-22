@@ -1,6 +1,6 @@
 use axum::{
     extract::{Path, State},
-    http::StatusCode,
+    http::{StatusCode, header, Method},
     response::Json,
     routing::{get, post, delete},
     Router,
@@ -8,6 +8,8 @@ use axum::{
 use mongodb::bson::{doc, oid::ObjectId};
 use chrono::Utc;
 use serde_json::json;
+use tower_http::cors::{CorsLayer, Any};
+use tower_http::services::ServeDir;
 
 use crate::db::MongoDb;
 use crate::models::{CreateAlertRequest, PriceAlert, AlertResponse};
@@ -22,13 +24,30 @@ pub struct AppState {
 pub fn create_router(db: MongoDb) -> Router {
     let state = AppState { db };
     
-    Router::new()
+    // CORS configuration
+    let cors = CorsLayer::new()
+        .allow_origin(Any)
+        .allow_methods([Method::GET, Method::POST, Method::DELETE])
+        .allow_headers([header::CONTENT_TYPE]);
+    
+    // API routes
+    let api_routes = Router::new()
         .route("/", get(health_check))
         .route("/alerts", post(create_alert))
         .route("/alerts", get(list_alerts))
         .route("/alerts/:id", delete(delete_alert))
         .route("/alerts/check", post(manual_price_check))
         .with_state(state)
+        .layer(cors);
+    
+    // Serve static frontend files
+    let frontend_service = ServeDir::new("frontend")
+        .append_index_html_on_directories(true);
+    
+    // Combine routes
+    Router::new()
+        .nest_service("/app", frontend_service)
+        .merge(api_routes)
 }
 
 async fn health_check() -> Json<serde_json::Value> {

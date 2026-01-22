@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clothing Price Tracker</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🛍️ Clothing Price Tracker</h1>
+            <p class="subtitle">Track prices across Myntra, Flipkart, Ajio & Tata Cliq</p>
+        </header>
+
+        <div class="main-content">
+            <!-- Add Alert Form -->
+            <section class="card">
+                <h2>Create Price Alert</h2>
+                <form id="alertForm">
+                    <div class="form-group">
+                        <label for="productUrl">Product URL</label>
+                        <input 
+                            type="url" 
+                            id="productUrl" 
+                            name="url" 
+                            placeholder="https://www.myntra.com/tshirts/product-name"
+                            required
+                        >
+                        <small class="hint">Supports: Myntra, Flipkart, Ajio, Tata Cliq</small>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="targetPrice">Target Price (₹)</label>
+                            <input 
+                                type="number" 
+                                id="targetPrice" 
+                                name="target_price" 
+                                placeholder="999"
+                                min="1"
+                                step="0.01"
+                                required
+                            >
+                        </div>
+
+                        <div class="form-group">
+                            <label for="userEmail">Email</label>
+                            <input 
+                                type="email" 
+                                id="userEmail" 
+                                name="user_email" 
+                                placeholder="you@example.com"
+                                required
+                            >
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary">
+                        <span>Add Alert</span>
+                    </button>
+                </form>
+            </section>
+
+            <!-- Stats Cards -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-value" id="totalAlerts">0</div>
+                    <div class="stat-label">Active Alerts</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="priceDrops">0</div>
+                    <div class="stat-label">Price Drops</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="avgSavings">₹0</div>
+                    <div class="stat-label">Avg Target Price</div>
+                </div>
+            </div>
+
+            <!-- Alerts List -->
+            <section class="card">
+                <div class="section-header">
+                    <h2>Active Alerts</h2>
+                    <div class="actions">
+                        <button id="refreshBtn" class="btn btn-secondary">
+                            <span>🔄 Refresh</span>
+                        </button>
+                        <button id="checkPricesBtn" class="btn btn-secondary">
+                            <span>💰 Check Prices Now</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div id="alertsList">
+                    <div class="loading">Loading alerts...</div>
+                </div>
+            </section>
+        </div>
+
+        <footer>
+            <p>Built with ❤️ using Rust + Axum | Background checks every 6 hours</p>
+        </footer>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div id="toastContainer"></div>
+
+    <script src="app.js"></script>
+</body>
+</html>
