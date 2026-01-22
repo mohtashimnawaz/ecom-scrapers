@@ -34,34 +34,37 @@ impl PriceScraper for MyntraScraper {
         
         let html = response.text().await?;
         
-        // Look for window.__myx or pdpData in script tags
-        let re = Regex::new(r#"pdpData["\s:]+(\{.*?\})\s*[,;]"#)?;
-        
-        if let Some(captures) = re.captures(&html) {
+        // Primary: Look for window.__myntra_preloaded_state__ (2026 spec)
+        let re_preloaded = Regex::new(r#"window\.__myntra_preloaded_state__\s*=\s*(\{[\s\S]*?\});"#)?;
+        if let Some(captures) = re_preloaded.captures(&html) {
             if let Some(json_str) = captures.get(1) {
-                let data: Value = serde_json::from_str(json_str.as_str())?;
-                
-                // Try multiple paths where price might be
-                if let Some(price) = data["price"]["discounted"].as_f64() {
-                    tracing::info!("Found Myntra price: ₹{}", price);
-                    return Ok(price);
-                }
-                
-                if let Some(price) = data["mrp"].as_f64() {
-                    tracing::info!("Found Myntra MRP: ₹{}", price);
-                    return Ok(price);
+                if let Ok(data) = serde_json::from_str::<Value>(json_str.as_str()) {
+                    // Navigate the preloaded state structure
+                    if let Some(price) = data["pdpData"]["price"]["discounted"].as_f64() {
+                        tracing::info!("Found Myntra price (preloaded_state): ₹{}", price);
+                        return Ok(price);
+                    }
+                    if let Some(price) = data["pdpData"]["price"]["mrp"].as_f64() {
+                        tracing::info!("Found Myntra MRP (preloaded_state): ₹{}", price);
+                        return Ok(price);
+                    }
                 }
             }
         }
         
-        // Fallback: Look for __PRELOADED_STATE__
-        let re2 = Regex::new(r#"window\.__myx\s*=\s*(\{.*?\});"#)?;
-        if let Some(captures) = re2.captures(&html) {
+        // Fallback: Look for pdpData in script tags
+        let re = Regex::new(r#"pdpData["\s:]+(\{.*?\})\s*[,;]"#)?;
+        if let Some(captures) = re.captures(&html) {
             if let Some(json_str) = captures.get(1) {
                 let data: Value = serde_json::from_str(json_str.as_str())?;
                 
-                if let Some(price) = data["pdpData"]["price"]["discounted"].as_f64() {
-                    tracing::info!("Found Myntra price (alternative): ₹{}", price);
+                if let Some(price) = data["price"]["discounted"].as_f64() {
+                    tracing::info!("Found Myntra price (pdpData): ₹{}", price);
+                    return Ok(price);
+                }
+                
+                if let Some(price) = data["mrp"].as_f64() {
+                    tracing::info!("Found Myntra MRP (pdpData): ₹{}", price);
                     return Ok(price);
                 }
             }

@@ -47,7 +47,8 @@ impl PriceScraper for FlipkartScraper {
         
         // Try multiple selectors as Flipkart changes them frequently
         let selectors = vec![
-            ".Nx9bqj",  // Current price selector (2026)
+            ".Nx9W0j",  // Current price selector (2026 spec)
+            ".Nx9bqj",  // Alternative
             "._30jeq3", // Alternative
             "._16Jk6d", // Another alternative
             ".CEmiEU",  // Older selector
