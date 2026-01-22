@@ -1,18 +1,28 @@
 # Clothing Price Tracker
 
-Professional-grade price tracking system for Indian e-commerce clothing platforms built with Rust.
+Professional-grade price tracking system for Indian e-commerce clothing platforms built with Rust and modern web technologies.
+
+## ✨ Features
+
+- **🎨 Modern Web UI**: Sleek dark-themed dashboard with real-time updates
+- **📊 Live Statistics**: Track alerts, price drops, and savings
+- **🔔 Price Alerts**: Get notified when prices drop below target
+- **🤖 Auto-monitoring**: Background checks every 6 hours
+- **📱 Responsive**: Works on desktop, tablet, and mobile
+- **⚡ Fast**: Built with Rust for maximum performance
 
 ## 🎯 Supported Platforms
 
 - **Myntra** - JSON extraction from `window.__myntra_preloaded_state__`
-- **Flipkart** - CSS selector scraping (`.Nx9bqj`)
+- **Flipkart** - CSS selector scraping (`.Nx9W0j`)
 - **Ajio** - JSON extraction from `window.__INITIAL_STATE__`
 - **Tata Cliq** - CSS selector scraping (`div.ProductDescription__price`)
 
 ## 🏗️ Architecture
 
 ### Tech Stack
-- **Web Framework**: Axum (high-performance async)
+- **Backend**: Axum (high-performance async web framework)
+- **Frontend**: Vanilla JavaScript + Modern CSS
 - **Database**: MongoDB (flexible document storage)
 - **HTTP Client**: Reqwest (with stealth headers)
 - **HTML Parsing**: Scraper crate
@@ -26,21 +36,46 @@ src/
 ├── main.rs              # Entry point & server setup
 ├── models.rs            # MongoDB document models
 ├── db.rs                # Database connection & operations
-├── scraper_trait.rs     # PriceScraper trait definition
-├── api.rs               # REST API endpoints
+├── scraper_trait.rs     # PriceScraper trait (+ static file serving)
 ├── worker.rs            # Background price monitoring
 └── scrapers/
     ├── myntra.rs        # Myntra scraper implementation
     ├── flipkart.rs      # Flipkart scraper implementation
     ├── ajio.rs          # Ajio scraper implementation
     └── tata_cliq.rs     # Tata Cliq scraper implementation
+
+frontend/
+├── index.html           # Main web interface
+├── style.css            # Dark theme styling
+├── app.js               # Frontend logic & API calls
+└── README.md            # Frontend docution
+    └── tata_cliq.rs     # Tata Cliq scraper implementation
 ```
 
 ## 🚀 Quick Start
 
-### Prerequisites
+###**Quick start** (automated):
+```bash
+./start.sh
+```
 
-- Rust 1.75+ ([Install Rust](https://rustup.rs/))
+2. **Manual setup**:
+```bash
+# Start MongoDB
+brew services start mongodb-community  # macOS
+# OR
+sudo systemctl start mongod  # Linux
+
+# Configure environment
+cp .env.example .env
+
+# Build and run
+cargo run --release
+```
+
+3. **Access the application**:
+- 🎨 **Frontend**: http://localhost:3000/app
+- 🔌 **API**: http://localhost:3000st](https://rustup.rs/))
 - MongoDB 6.0+ ([Install MongoDB](https://www.mongodb.com/try/download/community))
 
 ### Installation

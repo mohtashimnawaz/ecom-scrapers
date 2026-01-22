@@ -48,6 +48,7 @@ async fn main() -> anyhow::Result<()> {
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
     
     tracing::info!("🚀 Server starting on http://{}", addr);
+    tracing::info!("🎨 Frontend available at http://{}/app", addr);
     tracing::info!("📊 Monitoring prices every 6 hours");
     tracing::info!("📝 API Endpoints:");
     tracing::info!("  GET  /           - Health check");
