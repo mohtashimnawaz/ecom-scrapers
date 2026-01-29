@@ -13,6 +13,7 @@ use uuid::Uuid;
 
 use crate::db::Database;
 use crate::models::{CreateAlertRequest, PriceAlert, AlertResponse};
+use crate::email::EmailService;
 use crate::scraper_trait::detect_platform;
 use crate::worker::trigger_manual_check;
 
@@ -36,6 +37,7 @@ pub fn create_router(db: Database) -> Router {
         .route("/alerts", post(create_alert))
         .route("/alerts", get(list_alerts))
         .route("/alerts/:id", delete(delete_alert))
+        .route("/email/test", post(test_email))
         .route("/alerts/check", post(manual_price_check))
         .with_state(state)
         .layer(cors);
@@ -138,4 +140,25 @@ async fn manual_price_check(
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     
     Ok(Json(json!({ "message": "Price check triggered successfully" })))
+}
+
+async fn test_email(
+    State(_state): State<AppState>,
+    Json(payload): Json<serde_json::Value>,
+) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+    let to_email = payload["email"]
+        .as_str()
+        .ok_or_else(|| (StatusCode::BAD_REQUEST, "email field required".to_string()))?;
+    
+    let email_service = EmailService::from_env()
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Email not configured: {}", e)))?;
+    
+    email_service.send_test_email(to_email)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to send email: {}", e)))?;
+    
+    Ok(Json(json!({ 
+        "message": format!("Test email sent to {}", to_email),
+        "status": "success"
+    })))
 }

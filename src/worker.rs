@@ -2,6 +2,7 @@ use std::time::Duration;
 use tokio::time::interval;
 use crate::db::Database;
 use crate::scrapers::create_scraper;
+use crate::email::EmailService;
 
 pub async fn start_price_monitor(db: Database) {
     tracing::info!("Starting background price monitoring worker (6-hour interval)");
@@ -24,6 +25,9 @@ async fn check_all_alerts(db: Database) -> anyhow::Result<()> {
     
     let mut alerts_checked = 0;
     let mut price_drops = 0;
+    
+    // Initialize email service (optional - only if credentials are set)
+    let email_service = EmailService::from_env().ok();
     
     for alert in alerts {
         alerts_checked += 1;
@@ -58,8 +62,21 @@ async fn check_all_alerts(db: Database) -> anyhow::Result<()> {
                     );
                     price_drops += 1;
                     
-                    // TODO: Send email notification here
-                    // send_email(&alert.user_email, &alert.url, current_price, alert.target_price).await?;
+                    // Send email notification if service is configured
+                    if let Some(ref email_svc) = email_service {
+                        match email_svc.send_price_drop_alert(
+                            &alert.user_email,
+                            &alert.url,
+                            current_price,
+                            alert.target_price,
+                            &alert.platform
+                        ).await {
+                            Ok(_) => tracing::info!("📧 Email sent to {}", alert.user_email),
+                            Err(e) => tracing::error!("Failed to send email: {}", e),
+                        }
+                    } else {
+                        tracing::warn!("Email service not configured - skipping notification");
+                    }
                 }
                 
                 // Update alert with new price
