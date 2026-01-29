@@ -6,6 +6,7 @@ Professional-grade multi-user price tracking system for Indian e-commerce clothi
 
 ### Core Features
 - **🔐 User Authentication**: Secure JWT-based login/signup system
+- **🧩 Browser Extension**: One-click tracking from product pages (Chrome/Firefox)
 - **📊 Price History & Charts**: Interactive Chart.js visualizations
 - **📧 Email Notifications**: HTML email alerts when prices drop
 - **🎨 Modern Web UI**: Sleek dark-themed dashboard with real-time updates
