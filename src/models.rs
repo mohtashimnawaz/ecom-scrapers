@@ -1,19 +1,17 @@
 use serde::{Deserialize, Serialize};
-use mongodb::bson::oid::ObjectId;
 use chrono::{DateTime, Utc};
+use uuid::Uuid;
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, sqlx::FromRow)]
 pub struct PriceAlert {
-    #[serde(rename = "_id", skip_serializing_if = "Option::is_none")]
-    pub id: Option<ObjectId>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub id: Option<Uuid>,
     pub url: String,
     pub target_price: f64,
     pub last_price: Option<f64>,
     pub user_email: String,
     pub platform: String, // myntra, flipkart, ajio, tata_cliq
-    #[serde(with = "bson::serde_helpers::chrono_datetime_as_bson_datetime")]
     pub created_at: DateTime<Utc>,
-    #[serde(with = "bson::serde_helpers::chrono_datetime_as_bson_datetime")]
     pub last_checked: DateTime<Utc>,
     pub is_active: bool,
 }
@@ -38,7 +36,7 @@ pub struct AlertResponse {
 impl From<PriceAlert> for AlertResponse {
     fn from(alert: PriceAlert) -> Self {
         AlertResponse {
-            id: alert.id.map(|id| id.to_hex()).unwrap_or_default(),
+            id: alert.id.map(|id| id.to_string()).unwrap_or_default(),
             url: alert.url,
             target_price: alert.target_price,
             last_price: alert.last_price,

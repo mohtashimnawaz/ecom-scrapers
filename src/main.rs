@@ -22,14 +22,12 @@ async fn main() -> anyhow::Result<()> {
     // Load environment variables
     dotenv::dotenv().ok();
     
-    // Get MongoDB connection string from environment
-    let mongodb_uri = std::env::var("MONGODB_URI")
-        .unwrap_or_else(|_| "mongodb://localhost:27017".to_string());
-    let db_name = std::env::var("DB_NAME")
-        .unwrap_or_else(|_| "price_tracker".to_string());
+    // Get database URL from environment
+    let database_url = std::env::var("DATABASE_URL")
+        .unwrap_or_else(|_| "postgresql://postgres:postgres@localhost:5432/price_tracker".to_string());
     
-    tracing::info!("Connecting to MongoDB...");
-    let db = db::MongoDb::new(&mongodb_uri, &db_name).await?;
+    tracing::info!("Connecting to Supabase PostgreSQL...");
+    let db = db::Database::new(&database_url).await?;
     
     // Start background worker
     let worker_db = db.clone();

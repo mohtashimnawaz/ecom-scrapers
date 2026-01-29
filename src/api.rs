@@ -5,23 +5,23 @@ use axum::{
     routing::{get, post, delete},
     Router,
 };
-use mongodb::bson::{doc, oid::ObjectId};
 use chrono::Utc;
 use serde_json::json;
 use tower_http::cors::{CorsLayer, Any};
 use tower_http::services::ServeDir;
+use uuid::Uuid;
 
-use crate::db::MongoDb;
+use crate::db::Database;
 use crate::models::{CreateAlertRequest, PriceAlert, AlertResponse};
 use crate::scraper_trait::detect_platform;
 use crate::worker::trigger_manual_check;
 
 #[derive(Clone)]
 pub struct AppState {
-    pub db: MongoDb,
+    pub db: Database,
 }
 
-pub fn create_router(db: MongoDb) -> Router {
+pub fn create_router(db: Database) -> Router {
     let state = AppState { db };
     
     // CORS configuration
@@ -54,7 +54,8 @@ async fn health_check() -> Json<serde_json::Value> {
     Json(json!({
         "status": "healthy",
         "service": "clothing-price-tracker",
-        "version": "0.1.0"
+        "version": "0.1.0",
+        "database": "supabase"
     }))
 }
 
@@ -93,14 +94,10 @@ async fn create_alert(
     };
     
     // Insert into database
-    let collection = state.db.alerts_collection();
-    let result = collection
-        .insert_one(&alert, None)
+    let created_alert = state.db
+        .create_alert(&alert)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-    
-    let mut created_alert = alert;
-    created_alert.id = Some(result.inserted_id.as_object_id().unwrap());
     
     Ok((StatusCode::CREATED, Json(created_alert.into())))
 }
@@ -108,44 +105,27 @@ async fn create_alert(
 async fn list_alerts(
     State(state): State<AppState>,
 ) -> Result<Json<Vec<AlertResponse>>, (StatusCode, String)> {
-    let collection = state.db.alerts_collection();
-    
-    let filter = doc! { "is_active": true };
-    let mut cursor = collection
-        .find(filter, None)
+    let alerts = state.db
+        .get_all_active_alerts()
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     
-    use futures::stream::StreamExt;
-    let mut alerts = Vec::new();
+    let responses: Vec<AlertResponse> = alerts.into_iter().map(|a| a.into()).collect();
     
-    while let Some(result) = cursor.next().await {
-        let alert = result.map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-        alerts.push(alert.into());
-    }
-    
-    Ok(Json(alerts))
+    Ok(Json(responses))
 }
 
 async fn delete_alert(
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> Result<StatusCode, (StatusCode, String)> {
-    let object_id = ObjectId::parse_str(&id)
+    let uuid = Uuid::parse_str(&id)
         .map_err(|_| (StatusCode::BAD_REQUEST, "Invalid alert ID".to_string()))?;
     
-    let collection = state.db.alerts_collection();
-    
-    // Soft delete by setting is_active to false
-    let update = doc! { "$set": { "is_active": false } };
-    let result = collection
-        .update_one(doc! { "_id": object_id }, update, None)
+    state.db
+        .delete_alert(uuid)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-    
-    if result.matched_count == 0 {
-        return Err((StatusCode::NOT_FOUND, "Alert not found".to_string()));
-    }
     
     Ok(StatusCode::NO_CONTENT)
 }

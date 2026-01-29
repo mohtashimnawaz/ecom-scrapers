@@ -1,11 +1,10 @@
 use std::time::Duration;
 use tokio::time::interval;
-use mongodb::bson::doc;
 use chrono::Utc;
-use crate::db::MongoDb;
+use crate::db::Database;
 use crate::scrapers::create_scraper;
 
-pub async fn start_price_monitor(db: MongoDb) {
+pub async fn start_price_monitor(db: Database) {
     tracing::info!("Starting background price monitoring worker (6-hour interval)");
     
     let mut ticker = interval(Duration::from_secs(6 * 60 * 60)); // 6 hours
@@ -21,20 +20,13 @@ pub async fn start_price_monitor(db: MongoDb) {
     }
 }
 
-async fn check_all_alerts(db: MongoDb) -> anyhow::Result<()> {
-    let collection = db.alerts_collection();
-    
-    // Find all active alerts
-    let filter = doc! { "is_active": true };
-    let mut cursor = collection.find(filter, None).await?;
+async fn check_all_alerts(db: Database) -> anyhow::Result<()> {
+    let alerts = db.get_all_active_alerts().await?;
     
     let mut alerts_checked = 0;
     let mut price_drops = 0;
     
-    use futures::stream::StreamExt;
-    
-    while let Some(result) = cursor.next().await {
-        let mut alert = result?;
+    for alert in alerts {
         alerts_checked += 1;
         
         // Get the appropriate scraper
@@ -51,7 +43,7 @@ async fn check_all_alerts(db: MongoDb) -> anyhow::Result<()> {
             Ok(current_price) => {
                 tracing::info!(
                     "Alert {}: Current=₹{}, Target=₹{}, Last=₹{:?}",
-                    alert.id.as_ref().map(|id| id.to_hex()).unwrap_or_default(),
+                    alert.id.map(|id| id.to_string()).unwrap_or_default(),
                     current_price,
                     alert.target_price,
                     alert.last_price
@@ -72,22 +64,8 @@ async fn check_all_alerts(db: MongoDb) -> anyhow::Result<()> {
                 }
                 
                 // Update alert with new price
-                alert.last_price = Some(current_price);
-                alert.last_checked = Utc::now();
-                
-                let update = doc! {
-                    "$set": {
-                        "last_price": current_price,
-                        "last_checked": mongodb::bson::to_bson(&Utc::now())?
-                    }
-                };
-                
                 if let Some(id) = alert.id {
-                    collection.update_one(
-                        doc! { "_id": id },
-                        update,
-                        None
-                    ).await?;
+                    db.update_alert_price(id, current_price).await?;
                 }
             }
             Err(e) => {
@@ -109,7 +87,8 @@ async fn check_all_alerts(db: MongoDb) -> anyhow::Result<()> {
 }
 
 /// Manual trigger for testing (can be exposed via API)
-pub async fn trigger_manual_check(db: MongoDb) -> anyhow::Result<String> {
+pub async fn trigger_manual_check(db: Database) -> anyhow::Result<String> {
     check_all_alerts(db).await?;
     Ok("Price check completed".to_string())
+}
 }
