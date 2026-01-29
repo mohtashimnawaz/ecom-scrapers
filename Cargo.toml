@@ -39,6 +39,11 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 # Email
 lettre = { version = "0.11", features = ["tokio1", "tokio1-native-tls", "smtp-transport", "builder", "hostname"] }
 
+# Authentication
+jsonwebtoken = "9.2"
+bcrypt = "0.15"
+axum-extra = { version = "0.9", features = ["typed-header"] }
+
 # Utilities
 chrono = { version = "0.4", features = ["serde"] }
 uuid = { version = "1.0", features = ["v4", "serde"] }

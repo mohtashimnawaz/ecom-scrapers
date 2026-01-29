@@ -8,10 +8,51 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 </head>
 <body>
-    <div class="container">
-        <header>
+    <!-- Auth Section (shown when not logged in) -->
+    <div id="authSection" class="auth-container">
+        <div class="auth-card">
             <h1>🛍️ Clothing Price Tracker</h1>
             <p class="subtitle">Track prices across Myntra, Flipkart, Ajio & Tata Cliq</p>
+            
+            <div id="loginForm" class="auth-form">
+                <h2>Login</h2>
+                <form id="loginFormElement">
+                    <input type="email" id="loginEmail" placeholder="Email" required>
+                    <input type="password" id="loginPassword" placeholder="Password" required>
+                    <button type="submit" class="btn btn-primary">Login</button>
+                </form>
+                <p class="auth-switch">
+                    Don't have an account? <a href="#" id="showSignup">Sign up</a>
+                </p>
+            </div>
+            
+            <div id="signupForm" class="auth-form" style="display: none;">
+                <h2>Sign Up</h2>
+                <form id="signupFormElement">
+                    <input type="email" id="signupEmail" placeholder="Email" required>
+                    <input type="password" id="signupPassword" placeholder="Password (min 6 chars)" required>
+                    <button type="submit" class="btn btn-primary">Sign Up</button>
+                </form>
+                <p class="auth-switch">
+                    Already have an account? <a href="#" id="showLogin">Login</a>
+                </p>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Main App (shown when logged in) -->
+    <div id="appSection" class="container" style="display: none;">
+        <header>
+            <div class="header-content">
+                <div>
+                    <h1>🛍️ Clothing Price Tracker</h1>
+                    <p class="subtitle">Track prices across Myntra, Flipkart, Ajio & Tata Cliq</p>
+                </div>
+                <div class="user-menu">
+                    <span id="userEmail" class="user-email"></span>
+                    <button id="logoutBtn" class="btn btn-danger">Logout</button>
+                </div>
+            </div>
         </header>
 
         <div class="main-content">

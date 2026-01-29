@@ -12,10 +12,14 @@ use tower_http::services::ServeDir;
 use uuid::Uuid;
 
 use crate::db::Database;
-use crate::models::{CreateAlertRequest, PriceAlert, AlertResponse};
+use crate::models::{
+    CreateAlertRequest, PriceAlert, AlertResponse,
+    SignupRequest, LoginRequest, AuthResponse, UserResponse
+};
 use crate::email::EmailService;
 use crate::scraper_trait::detect_platform;
 use crate::worker::trigger_manual_check;
+use crate::auth::{AuthUser, generate_token, hash_password, verify_password};
 
 #[derive(Clone)]
 pub struct AppState {
@@ -29,11 +33,16 @@ pub fn create_router(db: Database) -> Router {
     let cors = CorsLayer::new()
         .allow_origin(Any)
         .allow_methods([Method::GET, Method::POST, Method::DELETE])
-        .allow_headers([header::CONTENT_TYPE]);
+        .allow_headers([header::CONTENT_TYPE, header::AUTHORIZATION]);
     
     // API routes
     let api_routes = Router::new()
         .route("/", get(health_check))
+        // Auth routes (public)
+        .route("/auth/signup", post(signup))
+        .route("/auth/login", post(login))
+        .route("/auth/me", get(get_current_user))
+        // Alert routes (protected)
         .route("/alerts", post(create_alert))
         .route("/alerts", get(list_alerts))
         .route("/alerts/:id", delete(delete_alert))
@@ -63,7 +72,97 @@ async fn health_check() -> Json<serde_json::Value> {
     }))
 }
 
+// Authentication Handlers
+async fn signup(
+    State(state): State<AppState>,
+    Json(payload): Json<SignupRequest>,
+) -> Result<Json<AuthResponse>, (StatusCode, String)> {
+    // Validate email
+    if !payload.email.contains('@') {
+        return Err((StatusCode::BAD_REQUEST, "Invalid email address".to_string()));
+    }
+    
+    // Validate password length
+    if payload.password.len() < 6 {
+        return Err((StatusCode::BAD_REQUEST, "Password must be at least 6 characters".to_string()));
+    }
+    
+    // Check if user already exists
+    if let Some(_) = state.db.get_user_by_email(&payload.email).await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))? {
+        return Err((StatusCode::CONFLICT, "Email already registered".to_string()));
+    }
+    
+    // Hash password
+    let password_hash = hash_password(&payload.password)
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to hash password: {}", e)))?;
+    
+    // Create user
+    let user = state.db.create_user(&payload.email, &password_hash).await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    
+    // Generate JWT token
+    let token = generate_token(user.id, user.email.clone())
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to generate token: {}", e)))?;
+    
+    Ok(Json(AuthResponse {
+        token,
+        user: UserResponse {
+            id: user.id.to_string(),
+            email: user.email,
+            created_at: user.created_at,
+        },
+    }))
+}
+
+async fn login(
+    State(state): State<AppState>,
+    Json(payload): Json<LoginRequest>,
+) -> Result<Json<AuthResponse>, (StatusCode, String)> {
+    // Find user by email
+    let user = state.db.get_user_by_email(&payload.email).await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+        .ok_or_else(|| (StatusCode::UNAUTHORIZED, "Invalid email or password".to_string()))?;
+    
+    // Verify password
+    let valid = verify_password(&payload.password, &user.password_hash)
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Password verification failed: {}", e)))?;
+    
+    if !valid {
+        return Err((StatusCode::UNAUTHORIZED, "Invalid email or password".to_string()));
+    }
+    
+    // Generate JWT token
+    let token = generate_token(user.id, user.email.clone())
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to generate token: {}", e)))?;
+    
+    Ok(Json(AuthResponse {
+        token,
+        user: UserResponse {
+            id: user.id.to_string(),
+            email: user.email,
+            created_at: user.created_at,
+        },
+    }))
+}
+
+async fn get_current_user(
+    auth_user: AuthUser,
+    State(state): State<AppState>,
+) -> Result<Json<UserResponse>, (StatusCode, String)> {
+    let user = state.db.get_user_by_id(auth_user.user_id).await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+        .ok_or_else(|| (StatusCode::NOT_FOUND, "User not found".to_string()))?;
+    
+    Ok(Json(UserResponse {
+        id: user.id.to_string(),
+        email: user.email,
+        created_at: user.created_at,
+    }))
+}
+
 async fn create_alert(
+    auth_user: AuthUser,
     State(state): State<AppState>,
     Json(payload): Json<CreateAlertRequest>,
 ) -> Result<(StatusCode, Json<AlertResponse>), (StatusCode, String)> {
@@ -91,6 +190,7 @@ async fn create_alert(
         target_price: payload.target_price,
         last_price: None,
         user_email: payload.user_email,
+        user_id: Some(auth_user.user_id),
         platform: platform.to_string(),
         created_at: Utc::now(),
         last_checked: Utc::now(),
@@ -107,10 +207,11 @@ async fn create_alert(
 }
 
 async fn list_alerts(
+    auth_user: AuthUser,
     State(state): State<AppState>,
 ) -> Result<Json<Vec<AlertResponse>>, (StatusCode, String)> {
     let alerts = state.db
-        .get_all_active_alerts()
+        .get_alerts_by_user(auth_user.user_id)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     

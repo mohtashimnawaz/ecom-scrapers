@@ -1,6 +1,6 @@
 use anyhow::Result;
 use sqlx::{PgPool, postgres::PgPoolOptions};
-use crate::models::{PriceAlert, PriceHistory, PriceStats};
+use crate::models::{PriceAlert, PriceHistory, PriceStats, User};
 use chrono::Utc;
 use uuid::Uuid;
 
@@ -25,6 +25,26 @@ impl Database {
     }
     
     async fn create_tables(pool: &PgPool) -> Result<()> {
+        // Create users table for authentication
+        sqlx::query(
+            r#"
+            CREATE TABLE IF NOT EXISTS users (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                email TEXT UNIQUE NOT NULL,
+                password_hash TEXT NOT NULL,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            )
+            "#
+        )
+        .execute(pool)
+        .await?;
+        
+        // Create index on email for faster lookups
+        sqlx::query("CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)")
+            .execute(pool)
+            .await?;
+        
         sqlx::query(
             r#"
             CREATE TABLE IF NOT EXISTS price_alerts (
@@ -33,6 +53,7 @@ impl Database {
                 target_price DOUBLE PRECISION NOT NULL,
                 last_price DOUBLE PRECISION,
                 user_email TEXT NOT NULL,
+                user_id UUID REFERENCES users(id) ON DELETE CASCADE,
                 platform TEXT NOT NULL,
                 created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
                 last_checked TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -45,6 +66,11 @@ impl Database {
         
         // Create index on is_active for faster queries
         sqlx::query("CREATE INDEX IF NOT EXISTS idx_is_active ON price_alerts(is_active)")
+            .execute(pool)
+            .await?;
+        
+        // Create index on user_id for user-scoped queries
+        sqlx::query("CREATE INDEX IF NOT EXISTS idx_user_id ON price_alerts(user_id)")
             .execute(pool)
             .await?;
         
@@ -171,4 +197,58 @@ impl Database {
         
         Ok(stats)
     }
+    
+    // User authentication methods
+    pub async fn create_user(&self, email: &str, password_hash: &str) -> Result<User> {
+        let user = sqlx::query_as::<_, User>(
+            r#"
+            INSERT INTO users (email, password_hash, created_at, updated_at)
+            VALUES ($1, $2, $3, $4)
+            RETURNING *
+            "#
+        )
+        .bind(email)
+        .bind(password_hash)
+        .bind(Utc::now())
+        .bind(Utc::now())
+        .fetch_one(&self.pool)
+        .await?;
+        
+        Ok(user)
+    }
+    
+    pub async fn get_user_by_email(&self, email: &str) -> Result<Option<User>> {
+        let user = sqlx::query_as::<_, User>(
+            "SELECT * FROM users WHERE email = $1"
+        )
+        .bind(email)
+        .fetch_optional(&self.pool)
+        .await?;
+        
+        Ok(user)
+    }
+    
+    pub async fn get_user_by_id(&self, user_id: Uuid) -> Result<Option<User>> {
+        let user = sqlx::query_as::<_, User>(
+            "SELECT * FROM users WHERE id = $1"
+        )
+        .bind(user_id)
+        .fetch_optional(&self.pool)
+        .await?;
+        
+        Ok(user)
+    }
+    
+    // Update alerts to be user-scoped
+    pub async fn get_alerts_by_user(&self, user_id: Uuid) -> Result<Vec<PriceAlert>> {
+        let alerts = sqlx::query_as::<_, PriceAlert>(
+            "SELECT * FROM price_alerts WHERE user_id = $1 AND is_active = TRUE ORDER BY created_at DESC"
+        )
+        .bind(user_id)
+        .fetch_all(&self.pool)
+        .await?;
+        
+        Ok(alerts)
+    }
 }
+

@@ -5,6 +5,7 @@ mod scrapers;
 mod worker;
 mod api;
 mod email;
+mod auth;
 
 use std::net::SocketAddr;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};

@@ -1,14 +1,17 @@
 const API_BASE = 'http://localhost:3000';
 
+// Authentication State
+let authToken = localStorage.getItem('auth_token');
+let currentUser = null;
+
 // State
 let alerts = [];
 let autoRefreshInterval = null;
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
-    loadAlerts();
-    setupEventListeners();
-    startAutoRefresh();
+    setupAuthListeners();
+    checkAuthentication();
 });
 
 // Event Listeners
@@ -22,7 +25,9 @@ function setupEventListeners() {
 async function loadAlerts() {
     try {
         showLoading();
-        const response = await fetch(`${API_BASE}/alerts`);
+        const response = await fetch(`${API_BASE}/alerts`, {
+            headers: { 'Authorization': `Bearer ${authToken}` }
+        });
         
         if (!response.ok) {
             throw new Error('Failed to fetch alerts');
@@ -53,6 +58,7 @@ async function handleCreateAlert(e) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
+                'Authorization': `Bearer ${authToken}`
             },
             body: JSON.stringify(data)
         });
@@ -79,7 +85,8 @@ async function handleDeleteAlert(id) {
     
     try {
         const response = await fetch(`${API_BASE}/alerts/${id}`, {
-            method: 'DELETE'
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${authToken}` }
         });
         
         if (!response.ok) {
@@ -98,7 +105,8 @@ async function handleCheckPrices() {
     try {
         showToast('⏳ Checking prices...', 'info');
         const response = await fetch(`${API_BASE}/alerts/check`, {
-            method: 'POST'
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${authToken}` }
         });
         
         if (!response.ok) {
