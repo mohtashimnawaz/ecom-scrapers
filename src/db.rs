@@ -1,6 +1,6 @@
 use anyhow::Result;
 use sqlx::{PgPool, postgres::PgPoolOptions};
-use crate::models::PriceAlert;
+use crate::models::{PriceAlert, PriceHistory, PriceStats};
 use chrono::Utc;
 use uuid::Uuid;
 
@@ -45,6 +45,25 @@ impl Database {
         
         // Create index on is_active for faster queries
         sqlx::query("CREATE INDEX IF NOT EXISTS idx_is_active ON price_alerts(is_active)")
+            .execute(pool)
+            .await?;
+        
+        // Create price_history table for tracking price changes over time
+        sqlx::query(
+            r#"
+            CREATE TABLE IF NOT EXISTS price_history (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                alert_id UUID NOT NULL REFERENCES price_alerts(id) ON DELETE CASCADE,
+                price DOUBLE PRECISION NOT NULL,
+                checked_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            )
+            "#
+        )
+        .execute(pool)
+        .await?;
+        
+        // Create index on alert_id for faster lookups
+        sqlx::query("CREATE INDEX IF NOT EXISTS idx_alert_id ON price_history(alert_id)")
             .execute(pool)
             .await?;
         
@@ -104,5 +123,52 @@ impl Database {
             .await?;
         
         Ok(())
+    }
+    
+    // Save price snapshot to history
+    pub async fn save_price_snapshot(&self, alert_id: Uuid, price: f64) -> Result<()> {
+        sqlx::query(
+            "INSERT INTO price_history (alert_id, price, checked_at) VALUES ($1, $2, $3)"
+        )
+        .bind(alert_id)
+        .bind(price)
+        .bind(Utc::now())
+        .execute(&self.pool)
+        .await?;
+        
+        Ok(())
+    }
+    
+    // Get price history for an alert
+    pub async fn get_price_history(&self, alert_id: Uuid, limit: i64) -> Result<Vec<PriceHistory>> {
+        let history = sqlx::query_as::<_, PriceHistory>(
+            "SELECT * FROM price_history WHERE alert_id = $1 ORDER BY checked_at DESC LIMIT $2"
+        )
+        .bind(alert_id)
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await?;
+        
+        Ok(history)
+    }
+    
+    // Get price statistics for an alert
+    pub async fn get_price_stats(&self, alert_id: Uuid) -> Result<Option<PriceStats>> {
+        let stats = sqlx::query_as::<_, PriceStats>(
+            r#"
+            SELECT 
+                MIN(price) as lowest_price,
+                MAX(price) as highest_price,
+                AVG(price) as average_price,
+                COUNT(*) as data_points
+            FROM price_history 
+            WHERE alert_id = $1
+            "#
+        )
+        .bind(alert_id)
+        .fetch_optional(&self.pool)
+        .await?;
+        
+        Ok(stats)
     }
 }

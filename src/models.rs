@@ -45,3 +45,19 @@ impl From<PriceAlert> for AlertResponse {
         }
     }
 }
+
+#[derive(Debug, Serialize, Deserialize, Clone, sqlx::FromRow)]
+pub struct PriceHistory {
+    pub id: Uuid,
+    pub alert_id: Uuid,
+    pub price: f64,
+    pub checked_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, sqlx::FromRow)]
+pub struct PriceStats {
+    pub lowest_price: Option<f64>,
+    pub highest_price: Option<f64>,
+    pub average_price: Option<f64>,
+    pub data_points: Option<i64>,
+}

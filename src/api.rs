@@ -37,6 +37,8 @@ pub fn create_router(db: Database) -> Router {
         .route("/alerts", post(create_alert))
         .route("/alerts", get(list_alerts))
         .route("/alerts/:id", delete(delete_alert))
+        .route("/alerts/:id/history", get(get_price_history))
+        .route("/alerts/:id/stats", get(get_price_stats))
         .route("/email/test", post(test_email))
         .route("/alerts/check", post(manual_price_check))
         .with_state(state)
@@ -161,4 +163,49 @@ async fn test_email(
         "message": format!("Test email sent to {}", to_email),
         "status": "success"
     })))
+}
+
+async fn get_price_history(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+    let alert_id = Uuid::parse_str(&id)
+        .map_err(|_| (StatusCode::BAD_REQUEST, "Invalid UUID".to_string()))?;
+    
+    // Get last 30 price checks (default)
+    let history = state.db.get_price_history(alert_id, 30)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    
+    Ok(Json(json!({
+        "alert_id": id,
+        "history": history,
+        "count": history.len()
+    })))
+}
+
+async fn get_price_stats(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+    let alert_id = Uuid::parse_str(&id)
+        .map_err(|_| (StatusCode::BAD_REQUEST, "Invalid UUID".to_string()))?;
+    
+    let stats = state.db.get_price_stats(alert_id)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    
+    match stats {
+        Some(stats) => Ok(Json(json!({
+            "alert_id": id,
+            "lowest_price": stats.lowest_price,
+            "highest_price": stats.highest_price,
+            "average_price": stats.average_price,
+            "data_points": stats.data_points
+        }))),
+        None => Ok(Json(json!({
+            "alert_id": id,
+            "message": "No price history available yet"
+        })))
+    }
 }

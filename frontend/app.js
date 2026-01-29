@@ -134,6 +134,9 @@ function renderAlerts() {
         if (deleteBtn) {
             deleteBtn.addEventListener('click', () => handleDeleteAlert(alert.id));
         }
+        
+        // Load price history for each alert
+        loadPriceHistory(alert.id);
     });
 }
 
@@ -177,6 +180,16 @@ function createAlertCard(alert) {
                 ` : ''}
             </div>
             
+            <!-- Price History Chart -->
+            <div class="price-history-section">
+                <div class="chart-header">
+                    <h3>📊 Price History</h3>
+                    <button class="btn-link" onclick="loadPriceHistory('${alert.id}')">View Details</button>
+                </div>
+                <div id="stats-${alert.id}" class="price-stats"></div>
+                <canvas id="chart-${alert.id}" class="price-chart" height="80"></canvas>
+            </div>
+            
             <div class="alert-meta">
                 <div class="alert-email">📧 ${alert.user_email}</div>
                 ${isPriceDrop ? '<div class="price-drop">🚨 PRICE DROP DETECTED!</div>' : ''}
@@ -196,6 +209,143 @@ function showEmptyState(message = 'No active alerts. Create your first one above
             <p>${message}</p>
         </div>
     `;
+}
+
+// Price History Functions
+async function loadPriceHistory(alertId) {
+    try {
+        // Load price stats
+        const statsResponse = await fetch(`${API_BASE}/alerts/${alertId}/stats`);
+        if (statsResponse.ok) {
+            const stats = await statsResponse.json();
+            displayPriceStats(alertId, stats);
+        }
+        
+        // Load price history data
+        const historyResponse = await fetch(`${API_BASE}/alerts/${alertId}/history`);
+        if (historyResponse.ok) {
+            const data = await historyResponse.json();
+            if (data.history && data.history.length > 0) {
+                renderPriceChart(alertId, data.history);
+            }
+        }
+    } catch (error) {
+        console.error('Error loading price history:', error);
+    }
+}
+
+function displayPriceStats(alertId, stats) {
+    const container = document.getElementById(`stats-${alertId}`);
+    if (!container) return;
+    
+    if (stats.data_points && stats.data_points > 0) {
+        container.innerHTML = `
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <span class="stat-label">Best Price:</span>
+                    <span class="stat-value best">₹${stats.lowest_price.toFixed(2)}</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Highest:</span>
+                    <span class="stat-value">₹${stats.highest_price.toFixed(2)}</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Average:</span>
+                    <span class="stat-value">₹${stats.average_price.toFixed(2)}</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Checks:</span>
+                    <span class="stat-value">${stats.data_points}</span>
+                </div>
+            </div>
+        `;
+    } else {
+        container.innerHTML = '<p class="no-data">No price history yet</p>';
+    }
+}
+
+function renderPriceChart(alertId, history) {
+    const canvas = document.getElementById(`chart-${alertId}`);
+    if (!canvas) return;
+    
+    // Reverse to show oldest to newest
+    const sortedHistory = [...history].reverse();
+    
+    const labels = sortedHistory.map(h => {
+        const date = new Date(h.checked_at);
+        return date.toLocaleDateString('en-IN', { month: 'short', day: 'numeric' });
+    });
+    
+    const prices = sortedHistory.map(h => h.price);
+    
+    // Destroy existing chart if it exists
+    const existingChart = Chart.getChart(canvas);
+    if (existingChart) {
+        existingChart.destroy();
+    }
+    
+    new Chart(canvas, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Price (₹)',
+                data: prices,
+                borderColor: '#10b981',
+                backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                tension: 0.4,
+                fill: true,
+                pointRadius: 4,
+                pointHoverRadius: 6
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    mode: 'index',
+                    intersect: false,
+                    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                    padding: 12,
+                    titleColor: '#fff',
+                    bodyColor: '#fff',
+                    callbacks: {
+                        label: function(context) {
+                            return 'Price: ₹' + context.parsed.y.toFixed(2);
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: false,
+                    ticks: {
+                        color: '#9ca3af',
+                        callback: function(value) {
+                            return '₹' + value;
+                        }
+                    },
+                    grid: {
+                        color: 'rgba(75, 85, 99, 0.2)'
+                    }
+                },
+                x: {
+                    ticks: {
+                        color: '#9ca3af',
+                        maxRotation: 45,
+                        minRotation: 0
+                    },
+                    grid: {
+                        color: 'rgba(75, 85, 99, 0.2)'
+                    }
+                }
+            }
+        }
+    });
 }
 
 function updateStats() {

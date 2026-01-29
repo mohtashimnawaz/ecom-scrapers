@@ -82,6 +82,13 @@ async fn check_all_alerts(db: Database) -> anyhow::Result<()> {
                 // Update alert with new price
                 if let Some(id) = alert.id {
                     db.update_alert_price(id, current_price).await?;
+                    
+                    // Save price snapshot to history for tracking trends
+                    if let Err(e) = db.save_price_snapshot(id, current_price).await {
+                        tracing::error!("Failed to save price history: {}", e);
+                    } else {
+                        tracing::debug!("💾 Saved price snapshot: ₹{}", current_price);
+                    }
                 }
             }
             Err(e) => {
