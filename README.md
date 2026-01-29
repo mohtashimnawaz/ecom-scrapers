@@ -23,7 +23,8 @@ Professional-grade price tracking system for Indian e-commerce clothing platform
 ### Tech Stack
 - **Backend**: Axum (high-performance async web framework)
 - **Frontend**: Vanilla JavaScript + Modern CSS
-- **Database**: MongoDB (flexible document storage)
+- **Database**: Supabase (PostgreSQL)
+- **ORM**: SQLx (compile-time SQL verification)
 - **HTTP Client**: Reqwest (with stealth headers)
 - **HTML Parsing**: Scraper crate
 - **Async Runtime**: Tokio

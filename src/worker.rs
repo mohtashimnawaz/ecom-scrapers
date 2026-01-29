@@ -1,6 +1,5 @@
 use std::time::Duration;
 use tokio::time::interval;
-use chrono::Utc;
 use crate::db::Database;
 use crate::scrapers::create_scraper;
 
@@ -90,5 +89,4 @@ async fn check_all_alerts(db: Database) -> anyhow::Result<()> {
 pub async fn trigger_manual_check(db: Database) -> anyhow::Result<String> {
     check_all_alerts(db).await?;
     Ok("Price check completed".to_string())
-}
 }
