@@ -123,3 +123,110 @@ pub fn verify_password(password: &str, hash: &str) -> Result<bool> {
     let valid = bcrypt::verify(password, hash)?;
     Ok(valid)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_claims_creation() {
+        let user_id = Uuid::new_v4();
+        let email = "test@example.com".to_string();
+        
+        let claims = Claims::new(user_id, email.clone());
+        
+        assert_eq!(claims.sub, user_id.to_string());
+        assert_eq!(claims.email, email);
+        assert!(claims.exp > claims.iat);
+        assert_eq!(claims.exp - claims.iat, 24 * 3600); // 24 hours in seconds
+    }
+
+    #[test]
+    fn test_token_generation_and_verification() {
+        unsafe { std::env::set_var("JWT_SECRET", "test_secret_key_12345"); }
+        
+        let user_id = Uuid::new_v4();
+        let email = "test@example.com".to_string();
+        
+        // Generate token
+        let token = generate_token(user_id, email.clone()).unwrap();
+        assert!(!token.is_empty());
+        
+        // Verify token
+        let claims = verify_token(&token).unwrap();
+        assert_eq!(claims.sub, user_id.to_string());
+        assert_eq!(claims.email, email);
+    }
+
+    #[test]
+    fn test_invalid_token_verification() {
+        unsafe { std::env::set_var("JWT_SECRET", "test_secret_key_12345"); }
+        
+        let invalid_token = "invalid.jwt.token";
+        let result = verify_token(invalid_token);
+        
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_token_with_wrong_secret() {
+        unsafe { std::env::set_var("JWT_SECRET", "secret1"); }
+        let user_id = Uuid::new_v4();
+        let token = generate_token(user_id, "test@example.com".to_string()).unwrap();
+        
+        // Change secret
+        unsafe { std::env::set_var("JWT_SECRET", "secret2"); }
+        let result = verify_token(&token);
+        
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_password_hashing() {
+        let password = "SecurePassword123!";
+        
+        let hashed = hash_password(password).unwrap();
+        assert_ne!(hashed, password);
+        assert!(hashed.starts_with("$2b$")); // bcrypt hash format
+    }
+
+    #[test]
+    fn test_password_verification() {
+        let password = "SecurePassword123!";
+        let hashed = hash_password(password).unwrap();
+        
+        // Correct password
+        let valid = verify_password(password, &hashed).unwrap();
+        assert!(valid);
+        
+        // Wrong password
+        let invalid = verify_password("WrongPassword", &hashed).unwrap();
+        assert!(!invalid);
+    }
+
+    #[test]
+    fn test_different_passwords_produce_different_hashes() {
+        let password1 = "password1";
+        let password2 = "password2";
+        
+        let hash1 = hash_password(password1).unwrap();
+        let hash2 = hash_password(password2).unwrap();
+        
+        assert_ne!(hash1, hash2);
+    }
+
+    #[test]
+    fn test_same_password_produces_different_hashes() {
+        // bcrypt uses random salt, so same password should produce different hashes
+        let password = "SamePassword123";
+        
+        let hash1 = hash_password(password).unwrap();
+        let hash2 = hash_password(password).unwrap();
+        
+        assert_ne!(hash1, hash2);
+        
+        // But both should verify correctly
+        assert!(verify_password(password, &hash1).unwrap());
+        assert!(verify_password(password, &hash2).unwrap());
+    }
+}

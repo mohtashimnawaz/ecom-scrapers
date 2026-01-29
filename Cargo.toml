@@ -48,5 +48,19 @@ axum-extra = { version = "0.9", features = ["typed-header"] }
 chrono = { version = "0.4", features = ["serde"] }
 uuid = { version = "1.0", features = ["v4", "serde"] }
 dotenv = "0.15"
+
+[dev-dependencies]
+# HTTP mocking for tests
+mockito = "1.2"
+wiremock = "0.6"
+
+# Test utilities
+tokio-test = "0.4"
+serial_test = "3.0"
+assert_matches = "1.5"
+tower = { version = "0.4", features = ["util"] }
+
+# Test database
+sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "postgres", "chrono", "uuid", "migrate"] }
 async-trait = "0.1"
 futures = "0.3"

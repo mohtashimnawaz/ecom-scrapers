@@ -81,3 +81,116 @@ impl PriceScraper for MyntraScraper {
         url.contains("myntra.com")
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use mockito::Server;
+
+    #[tokio::test]
+    async fn test_myntra_can_handle() {
+        let scraper = MyntraScraper::new();
+        
+        assert!(scraper.can_handle("https://www.myntra.com/shirts/nike/nike-men-blue-shirt/12345/buy"));
+        assert!(scraper.can_handle("https://myntra.com/product/67890"));
+        assert!(!scraper.can_handle("https://www.flipkart.com/product"));
+        assert!(!scraper.can_handle("https://www.ajio.com/product"));
+    }
+
+    #[tokio::test]
+    async fn test_myntra_platform_name() {
+        let scraper = MyntraScraper::new();
+        assert_eq!(scraper.platform_name(), "myntra");
+    }
+
+    #[tokio::test]
+    async fn test_myntra_price_extraction_preloaded_state() {
+        let mut server = Server::new_async().await;
+        
+        let mock_html = r#"
+            <!DOCTYPE html>
+            <html>
+            <head><title>Product</title></head>
+            <body>
+                <script>
+                    window.__myntra_preloaded_state__ = {
+                        "pdpData": {
+                            "price": {
+                                "discounted": 1299,
+                                "mrp": 1999
+                            }
+                        }
+                    };
+                </script>
+            </body>
+            </html>
+        "#;
+        
+        let _m = server.mock("GET", "/product/12345")
+            .with_status(200)
+            .with_header("content-type", "text/html")
+            .with_body(mock_html)
+            .create_async()
+            .await;
+        
+        let scraper = MyntraScraper::new();
+        let url = format!("{}/product/12345", server.url());
+        let price = scraper.get_price(&url).await.unwrap();
+        
+        assert_eq!(price, 1299.0);
+    }
+
+    #[tokio::test]
+    async fn test_myntra_price_extraction_pdp_data() {
+        let mut server = Server::new_async().await;
+        
+        let mock_html = r#"
+            <!DOCTYPE html>
+            <html>
+            <body>
+                <script>
+                    var pdpData = {"price": {"discounted": 899, "mrp": 1299}};
+                </script>
+            </body>
+            </html>
+        "#;
+        
+        let _m = server.mock("GET", "/product/67890")
+            .with_status(200)
+            .with_header("content-type", "text/html")
+            .with_body(mock_html)
+            .create_async()
+            .await;
+        
+        let scraper = MyntraScraper::new();
+        let url = format!("{}/product/67890", server.url());
+        let price = scraper.get_price(&url).await.unwrap();
+        
+        assert_eq!(price, 899.0);
+    }
+
+    #[tokio::test]
+    async fn test_myntra_price_not_found() {
+        let mut server = Server::new_async().await;
+        
+        let mock_html = r#"
+            <!DOCTYPE html>
+            <html>
+            <body><p>No price data here</p></body>
+            </html>
+        "#;
+        
+        let _m = server.mock("GET", "/product/invalid")
+            .with_status(200)
+            .with_header("content-type", "text/html")
+            .with_body(mock_html)
+            .create_async()
+            .await;
+        
+        let scraper = MyntraScraper::new();
+        let url = format!("{}/product/invalid", server.url());
+        let result = scraper.get_price(&url).await;
+        
+        assert!(result.is_err());
+    }
+}

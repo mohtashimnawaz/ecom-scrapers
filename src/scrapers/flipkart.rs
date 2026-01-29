@@ -77,3 +77,114 @@ impl PriceScraper for FlipkartScraper {
         url.contains("flipkart.com")
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use mockito::Server;
+
+    #[tokio::test]
+    async fn test_flipkart_can_handle() {
+        let scraper = FlipkartScraper::new();
+        
+        assert!(scraper.can_handle("https://www.flipkart.com/product/p/abc123"));
+        assert!(scraper.can_handle("https://flipkart.com/item"));
+        assert!(!scraper.can_handle("https://www.myntra.com/product"));
+        assert!(!scraper.can_handle("https://www.ajio.com/product"));
+    }
+
+    #[tokio::test]
+    async fn test_flipkart_platform_name() {
+        let scraper = FlipkartScraper::new();
+        assert_eq!(scraper.platform_name(), "flipkart");
+    }
+
+    #[tokio::test]
+    async fn test_parse_price() {
+        let scraper = FlipkartScraper::new();
+        
+        assert_eq!(scraper.parse_price("₹1,299").unwrap(), 1299.0);
+        assert_eq!(scraper.parse_price("₹999").unwrap(), 999.0);
+        assert_eq!(scraper.parse_price("1,999").unwrap(), 1999.0);
+        assert_eq!(scraper.parse_price(" ₹2,500 ").unwrap(), 2500.0);
+    }
+
+    #[tokio::test]
+    async fn test_flipkart_price_extraction() {
+        let mut server = Server::new_async().await;
+        
+        let mock_html = r#"
+            <!DOCTYPE html>
+            <html>
+            <body>
+                <div class="Nx9W0j">₹1,499</div>
+            </body>
+            </html>
+        "#;
+        
+        let _m = server.mock("GET", "/product/123")
+            .with_status(200)
+            .with_header("content-type", "text/html")
+            .with_body(mock_html)
+            .create_async()
+            .await;
+        
+        let scraper = FlipkartScraper::new();
+        let url = format!("{}/product/123", server.url());
+        let price = scraper.get_price(&url).await.unwrap();
+        
+        assert_eq!(price, 1499.0);
+    }
+
+    #[tokio::test]
+    async fn test_flipkart_alternative_selector() {
+        let mut server = Server::new_async().await;
+        
+        let mock_html = r#"
+            <!DOCTYPE html>
+            <html>
+            <body>
+                <div class="_30jeq3">₹2,999</div>
+            </body>
+            </html>
+        "#;
+        
+        let _m = server.mock("GET", "/product/456")
+            .with_status(200)
+            .with_header("content-type", "text/html")
+            .with_body(mock_html)
+            .create_async()
+            .await;
+        
+        let scraper = FlipkartScraper::new();
+        let url = format!("{}/product/456", server.url());
+        let price = scraper.get_price(&url).await.unwrap();
+        
+        assert_eq!(price, 2999.0);
+    }
+
+    #[tokio::test]
+    async fn test_flipkart_price_not_found() {
+        let mut server = Server::new_async().await;
+        
+        let mock_html = r#"
+            <!DOCTYPE html>
+            <html>
+            <body><p>No price here</p></body>
+            </html>
+        "#;
+        
+        let _m = server.mock("GET", "/product/invalid")
+            .with_status(200)
+            .with_header("content-type", "text/html")
+            .with_body(mock_html)
+            .create_async()
+            .await;
+        
+        let scraper = FlipkartScraper::new();
+        let url = format!("{}/product/invalid", server.url());
+        let result = scraper.get_price(&url).await;
+        
+        assert!(result.is_err());
+    }
+}
