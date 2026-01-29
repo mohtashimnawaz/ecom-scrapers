@@ -1,53 +1,99 @@
 # Clothing Price Tracker
 
-Professional-grade price tracking system for Indian e-commerce clothing platforms built with Rust and modern web technologies.
+Professional-grade multi-user price tracking system for Indian e-commerce clothing platforms. Built with Rust, PostgreSQL, and modern web technologies.
 
 ## ✨ Features
 
+### Core Features
+- **🔐 User Authentication**: Secure JWT-based login/signup system
+- **📊 Price History & Charts**: Interactive Chart.js visualizations
+- **📧 Email Notifications**: HTML email alerts when prices drop
 - **🎨 Modern Web UI**: Sleek dark-themed dashboard with real-time updates
-- **📊 Live Statistics**: Track alerts, price drops, and savings
-- **🔔 Price Alerts**: Get notified when prices drop below target
+- **📈 Live Statistics**: Best/average prices, savings tracking
+- **🔔 Price Alerts**: User-specific alert management
 - **🤖 Auto-monitoring**: Background checks every 6 hours
 - **📱 Responsive**: Works on desktop, tablet, and mobile
 - **⚡ Fast**: Built with Rust for maximum performance
+- **🐳 Docker Ready**: Containerized deployment with Docker Compose
 
-## 🎯 Supported Platforms
-
+### Platform Support
 - **Myntra** - JSON extraction from `window.__myntra_preloaded_state__`
-- **Flipkart** - CSS selector scraping (`.Nx9W0j`)
+- **Flipkart** - CSS selector scraping
 - **Ajio** - JSON extraction from `window.__INITIAL_STATE__`
-- **Tata Cliq** - CSS selector scraping (`div.ProductDescription__price`)
+- **Tata Cliq** - CSS selector scraping
+
+## 🚀 Quick Start
+
+### Option 1: Docker Compose (Recommended)
+
+```bash
+# Clone and setup
+git clone <repo>
+cd ecom-scrapers
+cp .env.example .env
+
+# Edit .env with your credentials
+nano .env
+
+# Start with Docker
+docker-compose up -d
+
+# Access app
+open http://localhost:3000/app/
+```
+
+### Option 2: Local Development
+
+```bash
+# Prerequisites: Rust, PostgreSQL
+
+# Setup environment
+cp .env.example .env
+nano .env  # Add DATABASE_URL, JWT_SECRET
+
+# Run
+cargo run --release
+
+# Access app
+open http://localhost:3000/app/
+```
 
 ## 🏗️ Architecture
 
 ### Tech Stack
-- **Backend**: Axum (high-performance async web framework)
-- **Frontend**: Vanilla JavaScript + Modern CSS
-- **Database**: Supabase (PostgreSQL)
-- **ORM**: SQLx (compile-time SQL verification)
+- **Backend**: Axum 0.7 (high-performance async web framework)
+- **Frontend**: Vanilla JavaScript + Chart.js + Modern CSS
+- **Database**: PostgreSQL (Supabase or self-hosted)
+- **ORM**: SQLx 0.7 (compile-time SQL verification)
+- **Auth**: JWT with bcrypt password hashing
+- **Email**: lettre (SMTP support)
 - **HTTP Client**: Reqwest (with stealth headers)
 - **HTML Parsing**: Scraper crate
 - **Async Runtime**: Tokio
-- **Background Jobs**: 6-hour interval checks
+- **Containerization**: Docker + Docker Compose
 
 ### Components
 
 ```
 src/
 ├── main.rs              # Entry point & server setup
-├── models.rs            # MongoDB document models
-├── db.rs                # Database connection & operations
-├── scraper_trait.rs     # PriceScraper trait (+ static file serving)
+├── models.rs            # Data models (User, PriceAlert, etc.)
+├── db.rs                # Database operations with SQLx
+├── auth.rs              # JWT authentication & password hashing
+├── email.rs             # Email notification service
+├── scraper_trait.rs     # PriceScraper trait
+├── api.rs               # REST API endpoints
 ├── worker.rs            # Background price monitoring
 └── scrapers/
-    ├── myntra.rs        # Myntra scraper implementation
-    ├── flipkart.rs      # Flipkart scraper implementation
-    ├── ajio.rs          # Ajio scraper implementation
-    └── tata_cliq.rs     # Tata Cliq scraper implementation
+    ├── myntra.rs        # Myntra scraper
+    ├── flipkart.rs      # Flipkart scraper
+    ├── ajio.rs          # Ajio scraper
+    └── tata_cliq.rs     # Tata Cliq scraper
 
 frontend/
 ├── index.html           # Main web interface
 ├── style.css            # Dark theme styling
+└── app.js               # Frontend logic + auth
 ├── app.js               # Frontend logic & API calls
 └── README.md            # Frontend docution
     └── tata_cliq.rs     # Tata Cliq scraper implementation

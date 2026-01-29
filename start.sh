@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Quick Start Script for Clothing Price Tracker
-# This script starts MongoDB, builds the Rust backend, and opens the frontend
+# Production Start Script for Clothing Price Tracker
+# Checks database connection and starts the application
 
 set -e
 
@@ -11,13 +11,56 @@ echo "=================================="
 # Colors
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
+RED='\033[0;31m'
 NC='\033[0m' # No Color
 
-# Check if MongoDB is running
-echo -e "\n${YELLOW}1. Checking MongoDB...${NC}"
-if ! pgrep -x "mongod" > /dev/null; then
-    echo "Starting MongoDB..."
-    brew services start mongodb-community 2>/dev/null || \
+# Load environment variables
+if [ -f .env ]; then
+    echo -e "${YELLOW}Loading environment variables...${NC}"
+    export $(cat .env | grep -v '^#' | xargs)
+else
+    echo -e "${RED}Warning: .env file not found${NC}"
+fi
+
+# Check if DATABASE_URL is set
+if [ -z "$DATABASE_URL" ]; then
+    echo -e "${RED}ERROR: DATABASE_URL not set${NC}"
+    echo "Please set DATABASE_URL in .env file"
+    exit 1
+fi
+
+# Wait for database to be ready
+echo -e "\n${YELLOW}Checking database connection...${NC}"
+max_attempts=30
+attempt=0
+
+while [ $attempt -lt $max_attempts ]; do
+    if cargo run --bin check_db 2>/dev/null || true; then
+        echo -e "${GREEN}✓ Database connected${NC}"
+        break
+    fi
+    
+    attempt=$((attempt + 1))
+    if [ $attempt -eq $max_attempts ]; then
+        echo -e "${RED}ERROR: Could not connect to database after $max_attempts attempts${NC}"
+        exit 1
+    fi
+    
+    echo "Waiting for database... (attempt $attempt/$max_attempts)"
+    sleep 2
+done
+
+# Build and run
+echo -e "\n${YELLOW}Building application...${NC}"
+cargo build --release
+
+echo -e "\n${GREEN}✓ Build complete${NC}"
+echo -e "\n${YELLOW}Starting server...${NC}"
+echo -e "${GREEN}Server will be available at: http://localhost:${PORT:-3000}${NC}"
+echo -e "${GREEN}Frontend available at: http://localhost:${PORT:-3000}/app/${NC}"
+echo ""
+
+cargo run --release
     sudo systemctl start mongod 2>/dev/null || \
     docker start mongodb 2>/dev/null || \
     echo "Please start MongoDB manually"
